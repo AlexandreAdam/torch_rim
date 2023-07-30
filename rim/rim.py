@@ -5,6 +5,13 @@ from torch import nn
 from torch import Tensor
 from torch.func import vjp
 from .definitions import DEVICE
+import numpy as np
+from tqdm import tqdm
+import time
+import os, glob, re, json
+import numpy as np
+from datetime import datetime
+from torch.utils.data import DataLoader
 
 
 class RIM(nn.Module):
@@ -26,8 +33,6 @@ class RIM(nn.Module):
             device=DEVICE
             ):
         """
-        Recurrent Inference Machine
-        
         This class implements a Recurrent Inference Machine (RIM) for parameter inference. 
         It takes in a model, dimensions of the parameter space, and various other optional
         parameters to customize the behavior of the RIM.
@@ -200,7 +205,6 @@ class RIM(nn.Module):
         v_hat = self._score_var / (1 - self.beta_2 ** (time_step + 1))
         return m_hat / (torch.sqrt(v_hat) + self.epsilon)
 
-
     def rmsprop_score_update(self, score: Tensor, time_step: int):
         """
         Update the score using the RMSProp algorithm.
@@ -215,14 +219,232 @@ class RIM(nn.Module):
         self._score_mean = self.beta_1 * self._score_mean + (1 - self.beta_1) * score
         v_hat = self._score_var / (1 - self.beta_2 ** (time_step + 1))
         return score / (torch.sqrt(v_hat) + self.epsilon)
-
     
-    def loss_fn(y: Tensor, x_true: Tensor, w: Tensor = None, *args, **kwargs) -> Tensor:
+    def loss_fn(self, y: Tensor, x_true: Tensor, w: Tensor = None, *args, **kwargs) -> Tensor:
         B = y.shape[0]
         if w is None:
             w = torch.ones_like(x_true)
         x_series = self(y, *args, **kwargs)
+        x_true = self.inverse_link_function(x_true) # important to compute the loss in model space
         loss = sum([(w * (x - x_true)**2).sum() for x in x_series]) / B
         return loss
 
-    # def fit(): #TODO import code from score model here and adapt
+    def fit(
+        self,
+        dataset,
+        epochs=100,
+        learning_rate=1e-4,
+        batch_size=1,
+        shuffle=False,
+        patience=float('inf'),
+        tolerance=0,
+        max_time=float('inf'),
+        epsilon=1e-5,
+        warmup=0,
+        clip=0.,
+        checkpoints_directory=None,
+        model_checkpoint=None,
+        checkpoints=10,
+        models_to_keep=3,
+        seed=None,
+        model_id=None,
+        logname=None,
+        n_iterations_in_epoch=None,
+        logname_prefixe="score_model",
+        verbose=0
+    ):
+        """
+        Train the model on the provided dataset.
+
+        Parameters:
+            dataset (torch.utils.data.Dataset): The training dataset.
+            learning_rate (float, optional): The learning rate for optimizer. Default is 1e-4.
+            batch_size (int, optional): The batch size for training. Default is 1.
+            shuffle (bool, optional): Whether to shuffle the dataset during training. Default is False.
+            epochs (int, optional): The number of epochs for training. Default is 100.
+            patience (float, optional): The patience value for early stopping. Default is infinity.
+            tolerance (float, optional): The tolerance value for early stopping. Default is 0.
+            max_time (float, optional): The maximum training time in hours. Default is infinity.
+            epsilon (float, optional): The epsilon value. Default is 1e-5.
+            warmup (int, optional): The number of warmup iterations for learning rate. Default is 0.
+            clip (float, optional): The gradient clipping value. Default is 0.
+            model_checkpoint (float, optional): If checkpoints_directory is provided, this can be used to restart training from checkpoint.
+            checkpoints_directory (str, optional): The directory to save model checkpoints. Default is None.
+            checkpoints (int, optional): The interval for saving model checkpoints. Default is 10 epochs.
+            models_to_keep (int, optional): The number of best models to keep. Default is 3.
+            seed (int, optional): The random seed for numpy and torch. Default is None.
+            model_id (str, optional): The ID for the model. Default is None.
+            logname (str, optional): The logname for saving checkpoints. Default is None.
+            logname_prefixe (str, optional): The prefix for the logname. Default is "score_model".
+
+        Returns:
+            list: List of loss values during training.
+        """
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=False)
+        if n_iterations_in_epoch is None:
+            n_iterations_in_epoch = len(dataloader)
+        # if checkpoints_directory is None:
+            # checkpoints_directory = self.checkpoints_directory
+        
+        hyperparameters = self.model.hyperparameters
+       # ==== Take care of where to write checkpoints and stuff =================================================================
+        if model_id is not None:
+            logname = model_id
+        elif logname is not None:
+            logname = logname
+        else:
+            logname = logname_prefixe + "_" + datetime.now().strftime("%y%m%d%H%M%S")
+
+        save_checkpoint = False
+        if checkpoints_directory is not None:
+            save_checkpoint = True
+            if not os.path.isdir(checkpoints_directory):
+                os.mkdir(checkpoints_directory)
+                with open(os.path.join(checkpoints_directory, "script_params.json"), "w") as f:
+                    json.dump(
+                        {
+                            "dataset_path": dataset_path,
+                            "dataset_extension": dataset_extension,
+                            "dataset_key": dataset_extension,
+                            "learning_rate": learning_rate,
+                            "batch_size": batch_size,
+                            "shuffle": shuffle,
+                            "epochs": epochs,
+                            "patience": patience,
+                            "tolerance": tolerance,
+                            "max_time": max_time,
+                            "epsilon": epsilon,
+                            "warmup": warmup,
+                            "clip": clip,
+                            "checkpoint_directory": checkpoints_directory,
+                            "checkpoints": checkpoints,
+                            "models_to_keep": models_to_keep,
+                            "seed": seed,
+                            "model_id": model_id,
+                            "logname": logname,
+                            "logname_prefixe": logname_prefixe,
+                        },
+                        f,
+                        indent=4
+                    )
+                with open(os.path.join(checkpoints_directory, "model_hparams.json"), "w") as f:
+                    json.dump(hyperparameters, f, indent=4)
+
+            # ======= Load model if model_id is provided ===============================================================
+            paths = glob.glob(os.path.join(checkpoints_directory, "checkpoint*.pt"))
+            opt_paths = glob.glob(os.path.join(checkpoints_directory, "optimizer*.pt"))
+            checkpoint_indices = [int(re.findall('[0-9]+', os.path.split(path)[-1])[-1]) for path in paths]
+            scores = [float(re.findall('([0-9]{1}.[0-9]+e[+-][0-9]{2})', os.path.split(path)[-1])[-1]) for path in paths]
+            if model_id is not None and checkpoint_indices:
+                if model_checkpoint is not None:
+                    checkpoint_path = paths[checkpoint_indices.index(model_checkpoint)]
+                    self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.model.device))
+                    optimizer.load_state_dict(torch.load(opt_paths[checkpoints == model_checkpoint], map_location=self.device))
+                    print(f"Loaded checkpoint {model_checkpoint} of {model_id}")
+                    latest_checkpoint = model_checkpoint
+                else:
+                    max_checkpoint_index = np.argmax(checkpoint_indices)
+                    checkpoint_path = paths[max_checkpoint_index]
+                    self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
+                    optimizer.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
+                    print(f"Loaded checkpoint {checkpoint_indices[max_checkpoint_index]} of {model_id}")
+                    latest_checkpoint = checkpoint_indices[max_checkpoint_index]
+            else:
+                latest_checkpoint = 0
+
+        if seed is not None:
+            torch.manual_seed(seed)
+
+        best_loss = float('inf')
+        losses = []
+        step = 0
+        global_start = time.time()
+        estimated_time_for_epoch = 0
+        out_of_time = False
+
+        for epoch in (pbar := tqdm(range(epochs))):
+            if (time.time() - global_start) > max_time * 3600 - estimated_time_for_epoch:
+                break
+            epoch_start = time.time()
+            time_per_step_epoch_mean = 0
+            cost = 0
+            data_iter = iter(dataloader)
+            for _ in range(n_iterations_in_epoch):
+                start = time.time()
+                try:
+                    y, x_true, *args = next(data_iter)
+                except StopIteration:
+                    data_iter = iter(dataloader)
+                    y, x_true, *args = next(data_iter)
+                optimizer.zero_grad()
+                loss = self.loss_fn(y, x_true, *args)
+                loss.backward()
+
+                if step < warmup:
+                    for g in optimizer.param_groups:
+                        g['lr'] = learning_rate * np.minimum(step / warmup, 1.0)
+
+                if clip > 0:
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=clip)
+
+                optimizer.step()
+
+                _time = time.time() - start
+                time_per_step_epoch_mean += _time
+                cost += float(loss)
+                step += 1
+
+            time_per_step_epoch_mean /= len(dataloader)
+            cost /= len(dataloader)
+            pbar.set_description(f"Epoch {epoch + 1:d} | Cost: {cost:.1e} |")
+            losses.append(cost)
+            if verbose >= 2:
+                print(f"epoch {epoch} | cost {cost:.2e} | time per step {time_per_step_epoch_mean:.2e} s")
+            elif verbose == 1:
+                if (epoch + 1) % checkpoints == 0:
+                    print(f"epoch {epoch} | cost {cost:.1e}")
+
+            if np.isnan(cost):
+                print("Model exploded and returns NaN")
+                break
+
+            if cost < (1 - tolerance) * best_loss:
+                best_loss = cost
+                patience = patience
+            else:
+                patience -= 1
+
+            if (time.time() - global_start) > max_time * 3600:
+                out_of_time = True
+
+            if save_checkpoint:
+                if (epoch + 1) % checkpoints == 0 or patience == 0 or epoch == epochs - 1 or out_of_time:
+                    latest_checkpoint += 1
+                    with open(os.path.join(checkpoints_directory, "score_sheet.txt"), mode="a") as f:
+                        f.write(f"{latest_checkpoint} {cost}\n")
+                    torch.save(self.state_dict(), os.path.join(checkpoints_directory, f"checkpoint_{cost:.4e}_{latest_checkpoint:03d}.pt"))
+                    torch.save(optimizer.state_dict(), os.path.join(checkpoints_directory, f"optimizer_{cost:.4e}_{latest_checkpoint:03d}.pt"))
+                    paths = glob.glob(os.path.join(checkpoints_directory, "*.pt"))
+                    checkpoint_indices = [int(re.findall('[0-9]+', os.path.split(path)[-1])[-1]) for path in paths]
+                    scores = [float(re.findall('([0-9]{1}.[0-9]+e[+-][0-9]{2})', os.path.split(path)[-1])[-1]) for path in paths]
+                    if len(checkpoint_indices) > 2*models_to_keep: # has to be twice since we also save optimizer states
+                        index_to_delete = np.argmin(checkpoint_indices)
+                        os.remove(os.path.join(checkpoints_directory, f"checkpoint_{scores[index_to_delete]:.4e}_{checkpoint_indices[index_to_delete]:03d}.pt"))
+                        os.remove(os.path.join(checkpoints_directory, f"optimizer_{scores[index_to_delete]:.4e}_{checkpoint_indices[index_to_delete]:03d}.pt"))
+                        del scores[index_to_delete]
+                        del checkpoint_indices[index_to_delete]
+
+            if patience == 0:
+                print("Reached patience")
+                break
+
+            if out_of_time:
+                print("Out of time")
+                break
+
+            if epoch > 0:
+                estimated_time_for_epoch = time.time() - epoch_start
+
+        print(f"Finished training after {(time.time() - global_start) / 3600:.3f} hours.")
+        return losses
