@@ -1,5 +1,5 @@
 import torch
-from rim.architectures.layers import GRU, GRUBlock
+from rim.layers import GRU, GRUBlock
 
 
 def test_gru():

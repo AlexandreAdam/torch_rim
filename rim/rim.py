@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch import Tensor
 from torch.func import vjp
+from .definitions import DEVICE
 
 
 class RIM(nn.Module):
@@ -19,7 +20,10 @@ class RIM(nn.Module):
             initialization_method:str="zeros",
             approximate_inverse_fn:Callable=None,
             score_preprocessing_method:str="Identity",
-            epsilon=1e-7
+            epsilon=1e-7,
+            beta_1=0.9,
+            beta_2=0.999,
+            device=DEVICE
             ):
         """
         Recurrent Inference Machine
@@ -30,7 +34,7 @@ class RIM(nn.Module):
         
         Args:
             model (nn.Module): The model used for parameter inference.
-            dimensions (tuple): The dimensions of the parameter space.
+            dimensions (tuple): The dimensions of the parameter space (excluding channels)
             score_fn (Callable, optional): The score function used for parameter inference. 
                 If not provided, energy_fn must be provided.
             energy_fn (Callable, optional): The energy function used for parameter inference. 
@@ -49,15 +53,23 @@ class RIM(nn.Module):
             epsilon (float, optional): A small value used for numerical stability. Defaults to 1e-7.
         """
         super().__init__()
+        self.device = device
         self.model = model
+        self.C = self.model.channels
         self.T = T
         self.dimensions = dimensions
         self.epsilon = epsilon
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
         
-        if link_function is not None and inverse_link_function is not None:
-            raise ValueError("Both link function and its inverse must be provided, or neither")
-        self.link_function = link_function if link_function is not None else nn.Identity
-        self.inverse_link_function = inverse_link_function if link_function is not None else nn.Identity
+        if link_function is not None:
+            if inverse_link_function is None:
+                raise ValueError("Both link function and its inverse must be provided")
+            self.link_function = link_function
+            self.inverse_link_function = inverse_link_function
+        else:
+            self.link_function = nn.Identity()
+            self.inverse_link_function = nn.Identity()
         if initialization_method == "approximate_inverse":
             assert approximate_inverse_fn is not None, "approximate_inverse_fn must be provided"
             self.approximate_inverse_fn = approximate_inverse_fn
@@ -65,6 +77,7 @@ class RIM(nn.Module):
             raise ValueError("Initialization method not supported")
         self.initialization_method = initialization_method
         
+        self.score_preprocessing_method = score_preprocessing_method
         if score_preprocessing_method.upper() == "ADAM":
             self.score_preprocessing = self.adam_score_update
         elif score_preprocessing_method.upper() == "RMSPROP":
@@ -84,19 +97,19 @@ class RIM(nn.Module):
                 _energy_fn = lambda x: self.energy_fn(x, y, *args, **kwargs)
                 energy, vjp_func = vjp(_energy_fn, x)
                 v = torch.ones_like(energy)
-                return vjp_func(v)
+                return vjp_func(v)[0]
             
             def model_score_fn(x, y, *args, **kwargs):
                 _energy_fn = lambda x: self.energy_fn(self.link_function(x), y, *args, **kwargs)
                 energy, vjp_func = vjp(_energy_fn, x)
                 v = torch.ones_like(energy)
-                return vjp_func(v)
+                return vjp_func(v)[0]
             
         else:
             def model_score_fn(x, y, *args, **kwargs):
                 linked_x, vjp_func = vjp(self.link_function, x)
                 score = self.score_fn(linked_x, y, *args, **kwargs)
-                return vjp_func(score)
+                return vjp_func(score)[0]
             
         self.score_fn = score_fn
         self.model_score_fn = model_score_fn
@@ -116,20 +129,23 @@ class RIM(nn.Module):
                 the initialized parameters x, and the initialized hidden states h.
         """
         batch_size = observation.shape[0]
+        h = self.model.initalize_hidden_states(self.dimensions, batch_size).to(self.device)
         out = []
-        if self.initialization == "zeros":
-            x = torch.zeros((batch_size, *self.dimensions)).to(self.model.device)
-        elif self.initialization == "approximate_inverse":
+        if self.initialization_method == "zeros":
+            x = torch.zeros((batch_size, self.C, *self.dimensions)).to(self.device)
+        elif self.initialization_method == "approximate_inverse":
             x_param = self.approximate_inverse_fn(observation)
             x = self.inverse_link_function(x_param)
-        elif self.initialization == "model":
-            x = torch.zeros((batch_size, *self.dimensions)).to(self.model.device)
-            score = torch.zeros((batch_size, *self.dimensions)).to(self.model.device)
-            x = self.model(x, score, observation)
+        elif self.initialization_method == "model":
+            x = torch.zeros((batch_size, self.C, *self.dimensions)).to(self.device)
+            score = torch.zeros((batch_size, self.C, *self.dimensions)).to(self.device)
+            x, h = self.model(x, score, observation, h)
             out.append(x)
         else:
             raise ValueError("Initialization method not supported")
-        h = self.model.initalize_hidden_states(self.dimensions, batch_size)
+        if self.score_preprocessing_method.lower() in ["adam", "rmsprop"]:
+            self._score_mean = torch.zeros_like(x)
+            self._score_var = torch.zeros_like(x)
         return out, x, h
     
 
@@ -163,9 +179,9 @@ class RIM(nn.Module):
             args and kwargs: Additional arguments and keyword arguments for the score function.
         
         Returns:
-            Tensor: The predicted parameter x after the RIM optimization.
+            Tensor: The predicted parameter x after the RIM optimization (in parameter space). 
         """
-        return self.forward(y)[-1]
+        return self.inverse_link_function(self.forward(y)[-1])
             
     def adam_score_update(self, score: Tensor, time_step: int):
         """
@@ -200,3 +216,13 @@ class RIM(nn.Module):
         v_hat = self._score_var / (1 - self.beta_2 ** (time_step + 1))
         return score / (torch.sqrt(v_hat) + self.epsilon)
 
+    
+    def loss_fn(y: Tensor, x_true: Tensor, w: Tensor = None, *args, **kwargs) -> Tensor:
+        B = y.shape[0]
+        if w is None:
+            w = torch.ones_like(x_true)
+        x_series = self(y, *args, **kwargs)
+        loss = sum([(w * (x - x_true)**2).sum() for x in x_series]) / B
+        return loss
+
+    # def fit(): #TODO import code from score model here and adapt
