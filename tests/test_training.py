@@ -34,7 +34,6 @@ def test_training():
     learning_rate = 1e-3
     batch_size = B
     epochs = 10
-    epsilon = 0 # avoid t=0 in sde sample (not needed for VESDE)
     warmup = 0 # learning rate warmup
     clip = 0. # gradient clipping
     seed = 42
@@ -48,7 +47,6 @@ def test_training():
             checkpoints=1,
             models_to_keep=1,
             epochs=epochs, 
-            epsilon=epsilon, 
             warmup=warmup, 
             clip=clip, 
             seed=seed
@@ -73,7 +71,6 @@ def test_training_from_checkpoint():
     learning_rate = 1e-3
     batch_size = B
     epochs = 10
-    epsilon = 0 # avoid t=0 in sde sample (not needed for VESDE)
     warmup = 0 # learning rate warmup
     clip = 0. # gradient clipping
     seed = 42
@@ -86,7 +83,6 @@ def test_training_from_checkpoint():
             models_to_keep=1,
             batch_size=batch_size, 
             epochs=epochs, 
-            epsilon=epsilon, 
             warmup=warmup, 
             clip=clip, 
             seed=seed

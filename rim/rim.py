@@ -302,7 +302,7 @@ class RIM(nn.Module):
             list: List of loss values during training.
         """
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) if ema_decay > 0 else NullEMA 
+        ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) if ema_decay > 0 else NullEMA() 
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=False)
         if n_iterations_in_epoch is None:
             n_iterations_in_epoch = len(dataloader)
