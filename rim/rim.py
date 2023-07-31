@@ -4,7 +4,8 @@ import torch
 from torch import nn
 from torch import Tensor
 from torch.func import vjp
-from .definitions import DEVICE
+from .utils import load_architecture
+from .definitions import  DEVICE
 import numpy as np
 from tqdm import tqdm
 import time
@@ -17,8 +18,9 @@ from torch.utils.data import DataLoader
 class RIM(nn.Module):
     def __init__(
             self,
-            model:nn.Module,
             dimensions:tuple,
+            model:nn.Module=None,
+            checkpoints_directory=None,
             score_fn:Callable=None,
             energy_fn:Callable=None,
             T:int=10,
@@ -30,7 +32,8 @@ class RIM(nn.Module):
             epsilon=1e-7,
             beta_1=0.9,
             beta_2=0.999,
-            device=DEVICE
+            device=DEVICE,
+            **hyperparameters
             ):
         """
         This class implements a Recurrent Inference Machine (RIM) for parameter inference. 
@@ -58,6 +61,16 @@ class RIM(nn.Module):
             epsilon (float, optional): A small value used for numerical stability. Defaults to 1e-7.
         """
         super().__init__()
+        if model is None and checkpoints_directory is None:
+            raise ValueError("Must provide one of 'model' or 'checkpoints_directory'")
+        if checkpoints_directory is not None:
+            model, hyperparams = load_architecture(checkpoints_directory, model=model, device=device, hyperparameters=hyperparameters)
+            hyperparameters.update(hyperparams) 
+        else:
+            try:
+                hyperparameters.update(model.hyperparameters)
+            except AttributeError:
+                print("Model does not have an hyperparameters attribue")
         self.device = device
         self.model = model
         self.C = self.model.channels
@@ -93,6 +106,15 @@ class RIM(nn.Module):
             self.score_preprocessing = lambda x, t: x
         else:
             raise ValueError("score_preprocessing_method is not implemented")
+        hyperparameters.update({
+            "score_preprocessing_method": score_preprocessing_method,
+            "initialization_method": initialization_method,
+            "T": T,
+            "epsilon": epsilon,
+            "beta_1": beta_1,
+            "beta_2": beta_2
+            })
+        self.hyperparameters = hyperparameters
         
         if score_fn is None:
             if energy_fn is None:
@@ -247,7 +269,6 @@ class RIM(nn.Module):
         checkpoints=10,
         models_to_keep=3,
         seed=None,
-        model_id=None,
         logname=None,
         n_iterations_in_epoch=None,
         logname_prefixe="score_model",
@@ -273,26 +294,21 @@ class RIM(nn.Module):
             checkpoints (int, optional): The interval for saving model checkpoints. Default is 10 epochs.
             models_to_keep (int, optional): The number of best models to keep. Default is 3.
             seed (int, optional): The random seed for numpy and torch. Default is None.
-            model_id (str, optional): The ID for the model. Default is None.
             logname (str, optional): The logname for saving checkpoints. Default is None.
             logname_prefixe (str, optional): The prefix for the logname. Default is "score_model".
 
         Returns:
             list: List of loss values during training.
         """
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=False)
         if n_iterations_in_epoch is None:
             n_iterations_in_epoch = len(dataloader)
-        # if checkpoints_directory is None:
-            # checkpoints_directory = self.checkpoints_directory
         
-        hyperparameters = self.model.hyperparameters
-       # ==== Take care of where to write checkpoints and stuff =================================================================
-        if model_id is not None:
-            logname = model_id
-        elif logname is not None:
-            logname = logname
+        hyperparameters = self.hyperparameters
+        # ==== Take care of where to write checkpoints and stuff =================================================================
+        if os.path.isdir(checkpoints_directory):
+            logname = os.path.split(checkpoints_directory)[-1]
         else:
             logname = logname_prefixe + "_" + datetime.now().strftime("%y%m%d%H%M%S")
 
@@ -304,9 +320,6 @@ class RIM(nn.Module):
                 with open(os.path.join(checkpoints_directory, "script_params.json"), "w") as f:
                     json.dump(
                         {
-                            "dataset_path": dataset_path,
-                            "dataset_extension": dataset_extension,
-                            "dataset_key": dataset_extension,
                             "learning_rate": learning_rate,
                             "batch_size": batch_size,
                             "shuffle": shuffle,
@@ -321,7 +334,6 @@ class RIM(nn.Module):
                             "checkpoints": checkpoints,
                             "models_to_keep": models_to_keep,
                             "seed": seed,
-                            "model_id": model_id,
                             "logname": logname,
                             "logname_prefixe": logname_prefixe,
                         },
@@ -331,24 +343,25 @@ class RIM(nn.Module):
                 with open(os.path.join(checkpoints_directory, "model_hparams.json"), "w") as f:
                     json.dump(hyperparameters, f, indent=4)
 
-            # ======= Load model if model_id is provided ===============================================================
+            # ======= Load checkpoints if they are provided ===============================================================
             paths = glob.glob(os.path.join(checkpoints_directory, "checkpoint*.pt"))
             opt_paths = glob.glob(os.path.join(checkpoints_directory, "optimizer*.pt"))
             checkpoint_indices = [int(re.findall('[0-9]+', os.path.split(path)[-1])[-1]) for path in paths]
             scores = [float(re.findall('([0-9]{1}.[0-9]+e[+-][0-9]{2})', os.path.split(path)[-1])[-1]) for path in paths]
-            if model_id is not None and checkpoint_indices:
+            if checkpoint_indices:
                 if model_checkpoint is not None:
                     checkpoint_path = paths[checkpoint_indices.index(model_checkpoint)]
                     self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.model.device))
                     optimizer.load_state_dict(torch.load(opt_paths[checkpoints == model_checkpoint], map_location=self.device))
-                    print(f"Loaded checkpoint {model_checkpoint} of {model_id}")
+                    print(f"Loaded checkpoint {model_checkpoint} of {logname}")
                     latest_checkpoint = model_checkpoint
                 else:
                     max_checkpoint_index = np.argmax(checkpoint_indices)
                     checkpoint_path = paths[max_checkpoint_index]
+                    opt_path = opt_paths[max_checkpoint_index]
                     self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
-                    optimizer.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
-                    print(f"Loaded checkpoint {checkpoint_indices[max_checkpoint_index]} of {model_id}")
+                    optimizer.load_state_dict(torch.load(opt_path, map_location=self.device))
+                    print(f"Loaded checkpoint {checkpoint_indices[max_checkpoint_index]} of {logname}")
                     latest_checkpoint = checkpoint_indices[max_checkpoint_index]
             else:
                 latest_checkpoint = 0
@@ -423,7 +436,7 @@ class RIM(nn.Module):
                     latest_checkpoint += 1
                     with open(os.path.join(checkpoints_directory, "score_sheet.txt"), mode="a") as f:
                         f.write(f"{latest_checkpoint} {cost}\n")
-                    torch.save(self.state_dict(), os.path.join(checkpoints_directory, f"checkpoint_{cost:.4e}_{latest_checkpoint:03d}.pt"))
+                    torch.save(self.model.state_dict(), os.path.join(checkpoints_directory, f"checkpoint_{cost:.4e}_{latest_checkpoint:03d}.pt"))
                     torch.save(optimizer.state_dict(), os.path.join(checkpoints_directory, f"optimizer_{cost:.4e}_{latest_checkpoint:03d}.pt"))
                     paths = glob.glob(os.path.join(checkpoints_directory, "*.pt"))
                     checkpoint_indices = [int(re.findall('[0-9]+', os.path.split(path)[-1])[-1]) for path in paths]

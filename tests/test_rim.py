@@ -18,7 +18,7 @@ def setup(dim):
 
 def test_rim_hourglass_basic_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, score_fn, T=T)
+    rim = RIM(D, model, score_fn=score_fn, T=T)
     x_series =  rim(y)
     assert len(x_series) == T
     for x in x_series:
@@ -26,7 +26,7 @@ def test_rim_hourglass_basic_1d():
 
 def test_rim_hourglass_basic_2d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(2)
-    rim = RIM(model, D, score_fn, T=T)
+    rim = RIM(D, model, score_fn=score_fn, T=T)
     x_series =  rim(y)
     assert len(x_series) == T
     for x in x_series:
@@ -34,7 +34,7 @@ def test_rim_hourglass_basic_2d():
 
 def test_rim_hourglass_energy_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, energy_fn=energy_fn, T=T)
+    rim = RIM(D, model, energy_fn=energy_fn, T=T)
     x_series =  rim(y)
     assert len(x_series) == T
     for x in x_series:
@@ -42,7 +42,7 @@ def test_rim_hourglass_energy_1d():
 
 def test_rim_hourglass_model_init_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, score_fn, T=T, initialization_method="model")
+    rim = RIM(D, model, score_fn=score_fn, T=T, initialization_method="model")
     x_series =  rim(y)
     assert len(x_series) == T + 1
     for x in x_series:
@@ -53,7 +53,7 @@ def test_rim_hourglass_link_fn_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
     link_fn = lambda x: 2*x
     inv_link_fn = lambda x: x/2
-    rim = RIM(model, D, score_fn, T=T, link_function=link_fn, inverse_link_function=inv_link_fn, initialization_method="model")
+    rim = RIM(D, model, score_fn=score_fn, T=T, link_function=link_fn, inverse_link_function=inv_link_fn, initialization_method="model")
     x_series =  rim(y)
     assert len(x_series) == T + 1
     for x in x_series:
@@ -62,7 +62,7 @@ def test_rim_hourglass_link_fn_1d():
 
 def test_rim_hourglass_adam_preprocessing_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, score_fn, T=T, score_preprocessing_method="adam")
+    rim = RIM(D, model, score_fn=score_fn, T=T, score_preprocessing_method="adam")
     x_series =  rim(y)
     assert len(x_series) == T 
     for x in x_series:
@@ -70,7 +70,7 @@ def test_rim_hourglass_adam_preprocessing_1d():
 
 def test_rim_hourglass_arcsinh_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, score_fn, T=T, score_preprocessing_method="arcsinh")
+    rim = RIM(D, model, score_fn=score_fn, T=T, score_preprocessing_method="arcsinh")
     x_series =  rim(y)
     assert len(x_series) == T 
     for x in x_series:
@@ -79,7 +79,7 @@ def test_rim_hourglass_arcsinh_1d():
 
 def test_rim_hourglass_rmsprop_preprocessing_1d():
     x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
-    rim = RIM(model, D, score_fn, T=T, score_preprocessing_method="rmsprop")
+    rim = RIM(D, model, score_fn=score_fn, T=T, score_preprocessing_method="rmsprop")
     x_series =  rim(y)
     assert len(x_series) == T
     for x in x_series:

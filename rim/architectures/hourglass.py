@@ -3,8 +3,8 @@ from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
 from .base import Model
-from ..layers import *
-from .utils import get_activation
+from rim.utils import get_activation
+from rim.layers import *
 
 class Hourglass(Model):
     def __init__(
@@ -54,6 +54,7 @@ class Hourglass(Model):
             input_kernel_size = kernel_size
         self.hyperparameters = {
                 "channels": channels,
+                "architecture": "hourglass",
                 "nf": nf,
                 "ch_mult": ch_mult,
                 "dimensions": dimensions,
