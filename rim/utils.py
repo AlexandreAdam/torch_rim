@@ -7,6 +7,36 @@ from .definitions import DEVICE
 import os, re, json
 from glob import glob
 import numpy as np
+import contextlib
+
+class NullEMA:
+    """
+    An EMA emulator that does nothing so that ema_decay=0 can be supported. 
+    """
+    def update(self, parameters=None):
+        pass
+
+    def copy_to(self, parameters=None):
+        pass
+
+    def store(self, parameters=None):
+        pass
+
+    def restore(self, parameters=None):
+        pass
+
+    def average_parameters(self, parameters=None):
+        return contextlib.nullcontext()
+
+    def to(self, device=None, dtype=None):
+        pass
+
+    def state_dict(self):
+        return {}
+
+    def load_state_dict(self, state_dict):
+        pass
+
 
 
 def get_activation(activation:str):

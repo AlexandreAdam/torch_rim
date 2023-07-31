@@ -13,6 +13,8 @@ import os, glob, re, json
 import numpy as np
 from datetime import datetime
 from torch.utils.data import DataLoader
+from torch_ema import ExponentialMovingAverage
+from .utils import NullEMA
 
 
 class RIM(nn.Module):
@@ -261,17 +263,17 @@ class RIM(nn.Module):
         patience=float('inf'),
         tolerance=0,
         max_time=float('inf'),
-        epsilon=1e-5,
         warmup=0,
         clip=0.,
         checkpoints_directory=None,
         model_checkpoint=None,
         checkpoints=10,
         models_to_keep=3,
+        ema_decay=0,
         seed=None,
         logname=None,
         n_iterations_in_epoch=None,
-        logname_prefixe="score_model",
+        logname_prefixe="rim",
         verbose=0
     ):
         """
@@ -286,7 +288,6 @@ class RIM(nn.Module):
             patience (float, optional): The patience value for early stopping. Default is infinity.
             tolerance (float, optional): The tolerance value for early stopping. Default is 0.
             max_time (float, optional): The maximum training time in hours. Default is infinity.
-            epsilon (float, optional): The epsilon value. Default is 1e-5.
             warmup (int, optional): The number of warmup iterations for learning rate. Default is 0.
             clip (float, optional): The gradient clipping value. Default is 0.
             model_checkpoint (float, optional): If checkpoints_directory is provided, this can be used to restart training from checkpoint.
@@ -301,6 +302,7 @@ class RIM(nn.Module):
             list: List of loss values during training.
         """
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) if ema_decay > 0 else NullEMA 
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=False)
         if n_iterations_in_epoch is None:
             n_iterations_in_epoch = len(dataloader)
@@ -328,12 +330,12 @@ class RIM(nn.Module):
                             "patience": patience,
                             "tolerance": tolerance,
                             "max_time": max_time,
-                            "epsilon": epsilon,
                             "warmup": warmup,
                             "clip": clip,
                             "checkpoint_directory": checkpoints_directory,
                             "checkpoints": checkpoints,
                             "models_to_keep": models_to_keep,
+                            "ema_decay": ema_decay,
                             "seed": seed,
                             "logname": logname,
                             "logname_prefixe": logname_prefixe,
@@ -403,6 +405,7 @@ class RIM(nn.Module):
                     torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=clip)
 
                 optimizer.step()
+                ema.update()
 
                 _time = time.time() - start
                 time_per_step_epoch_mean += _time
@@ -437,7 +440,8 @@ class RIM(nn.Module):
                     latest_checkpoint += 1
                     with open(os.path.join(checkpoints_directory, "score_sheet.txt"), mode="a") as f:
                         f.write(f"{latest_checkpoint} {cost}\n")
-                    torch.save(self.model.state_dict(), os.path.join(checkpoints_directory, f"checkpoint_{cost:.4e}_{latest_checkpoint:03d}.pt"))
+                    with ema.average_parameters():
+                        torch.save(self.model.state_dict(), os.path.join(checkpoints_directory, f"checkpoint_{cost:.4e}_{latest_checkpoint:03d}.pt"))
                     torch.save(optimizer.state_dict(), os.path.join(checkpoints_directory, f"optimizer_{cost:.4e}_{latest_checkpoint:03d}.pt"))
                     paths = glob.glob(os.path.join(checkpoints_directory, "*.pt"))
                     checkpoint_indices = [int(re.findall('[0-9]+', os.path.split(path)[-1])[-1]) for path in paths]
@@ -460,5 +464,6 @@ class RIM(nn.Module):
             if epoch > 0:
                 estimated_time_for_epoch = time.time() - epoch_start
 
+        ema.copy_to(self.model.parameters())
         print(f"Finished training after {(time.time() - global_start) / 3600:.3f} hours.")
         return losses
