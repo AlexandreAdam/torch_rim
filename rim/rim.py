@@ -208,7 +208,7 @@ class RIM(nn.Module):
         Returns:
             Tensor: The predicted parameter x after the RIM optimization (in parameter space). 
         """
-        return self.inverse_link_function(self.forward(y)[-1])
+        return self.inverse_link_function(self.forward(y, *args, **kwargs)[-1])
             
     def adam_score_update(self, score: Tensor, time_step: int):
         """
@@ -242,10 +242,10 @@ class RIM(nn.Module):
         v_hat = self._score_var / (1 - self.beta_2 ** (time_step + 1))
         return score / (torch.sqrt(v_hat) + self.epsilon)
     
-    def loss_fn(self, y: Tensor, x_true: Tensor, w: Tensor = None, *args, **kwargs) -> Tensor:
+    def loss_fn(self, y: Tensor, x_true: Tensor, *args, **kwargs) -> Tensor:
         B = y.shape[0]
-        if w is None:
-            w = torch.ones_like(x_true)
+        # if w is None:
+        w = torch.ones_like(x_true) #TODO support weights
         x_series = self(y, *args, **kwargs)
         x_true = self.inverse_link_function(x_true) # important to compute the loss in model space
         loss = sum([(w * (x - x_true)**2).sum() for x in x_series]) / B
@@ -307,8 +307,9 @@ class RIM(nn.Module):
         
         hyperparameters = self.hyperparameters
         # ==== Take care of where to write checkpoints and stuff =================================================================
-        if os.path.isdir(checkpoints_directory):
-            logname = os.path.split(checkpoints_directory)[-1]
+        if checkpoints_directory is not None:
+            if os.path.isdir(checkpoints_directory):
+                logname = os.path.split(checkpoints_directory)[-1]
         else:
             logname = logname_prefixe + "_" + datetime.now().strftime("%y%m%d%H%M%S")
 
