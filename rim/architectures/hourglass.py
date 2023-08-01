@@ -30,17 +30,17 @@ class Hourglass(Model):
             layer = lambda in_ch, out_ch, k: nn.Conv1d(in_ch, out_ch, k, padding="same")
             if resample_with_conv:
                 downsample_layer = lambda in_ch, out_ch, k: Conv1dSame(in_ch, out_ch, k, stride=2)
-                upsample_layer = lambda in_ch, out_ch, k: ConvTranspose1dSame(in_ch, out_ch, k, stride=2)
+                upsample_layer = lambda in_ch, out_ch, k: ConvTransposed1dSame(in_ch, out_ch, k, stride=2)
         elif dimensions == 2:
             layer = lambda in_ch, out_ch, k: nn.Conv2d(in_ch, out_ch, k, padding="same")
             if resample_with_conv:
                 downsample_layer = lambda in_ch, out_ch, k: Conv2dSame(in_ch, out_ch, k, stride=2)
-                upsample_layer = lambda in_ch, out_ch, k: ConvTranspose2dSame(in_ch, out_ch, k, stride=2)
+                upsample_layer = lambda in_ch, out_ch, k: ConvTransposed2dSame(in_ch, out_ch, k, stride=2)
         elif dimensions == 3:
             layer = lambda in_ch, out_ch, k: nn.Conv3d(in_ch, out_ch, k, padding="same")
             if resample_with_conv:
                 downsample_layer = lambda in_ch, out_ch, k: Conv3dSame(in_ch, out_ch, k, stride=2)
-                upsample_layer = lambda in_ch, out_ch, k: ConvTranspose3dSame(in_ch, out_ch, k, stride=2)
+                upsample_layer = lambda in_ch, out_ch, k: ConvTransposed3dSame(in_ch, out_ch, k, stride=2)
         else:
             raise ValueError(f"The dimensions {dimensions} is not supported. Only 1, 2 and 3 dimensional input (not including channels) are.")
         if not resample_with_conv:
@@ -76,6 +76,7 @@ class Hourglass(Model):
         self.num_layers = num_layers
         self.hidden_units = hidden_units
         self.condition_on_observation = condition_on_observation
+        self.decoder_index = self.num_resolutions * (num_layers + 1)
         
         if condition_on_observation:
             raise ValueError("Not currently supported")
@@ -104,17 +105,16 @@ class Hourglass(Model):
         self.output_layer = layer(c, channels, 1)
 
     def forward(self, x, y, score, h):
-        index = 0
         x = torch.concat([x, score], dim=1) # for now don't include the observation in here
         x = self.act(self.input_layer(x))
         # Encoder
-        for i_layer, layer in enumerate(self.all_modules[:len(self.all_modules)//2]):
+        for i_layer, layer in enumerate(self.all_modules[:self.decoder_index]):
             x = layer(x)
             if (i_layer + 1) % (self.num_layers + 1) != 0:
                 x = self.act(x)
         x, h = self.gru_layer(x, h)
         # Decoder
-        for i_layer, layer in enumerate(self.all_modules[len(self.all_modules)//2:]):
+        for i_layer, layer in enumerate(self.all_modules[self.decoder_index:]):
             x = layer(x)
             if (i_layer + 1) % (self.num_layers + 1) != 0:
                 x = self.act(x)

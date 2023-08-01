@@ -258,6 +258,7 @@ class RIM(nn.Module):
         dataset,
         epochs=100,
         learning_rate=1e-4,
+        scheduler=None,
         batch_size=1,
         shuffle=False,
         patience=float('inf'),
@@ -272,8 +273,9 @@ class RIM(nn.Module):
         ema_decay=0,
         seed=None,
         logname=None,
+        logdir=None,
         n_iterations_in_epoch=None,
-        logname_prefixe="rim",
+        logname_prefix="rim",
         verbose=0
     ):
         """
@@ -296,12 +298,18 @@ class RIM(nn.Module):
             models_to_keep (int, optional): The number of best models to keep. Default is 3.
             seed (int, optional): The random seed for numpy and torch. Default is None.
             logname (str, optional): The logname for saving checkpoints. Default is None.
-            logname_prefixe (str, optional): The prefix for the logname. Default is "score_model".
+            logdir (str, optional): The path to the directory in which to create the new checkpoint_directory with logname.
+            logname_prefix (str, optional): The prefix for the logname. Default is "score_model".
 
         Returns:
             list: List of loss values during training.
         """
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        if scheduler is not None: # assumes the argument of the sceduler were wrapped in before
+            scheduler = scheduler(optimizer)
+        else:
+            scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.)
+
         ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) if ema_decay > 0 else NullEMA() 
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=False)
         if n_iterations_in_epoch is None:
@@ -312,12 +320,14 @@ class RIM(nn.Module):
         if checkpoints_directory is not None:
             if os.path.isdir(checkpoints_directory):
                 logname = os.path.split(checkpoints_directory)[-1]
-        else:
-            logname = logname_prefixe + "_" + datetime.now().strftime("%y%m%d%H%M%S")
+        elif logname is None:
+            logname = logname_prefix + "_" + datetime.now().strftime("%y%m%d%H%M%S")
 
         save_checkpoint = False
-        if checkpoints_directory is not None:
+        if checkpoints_directory is not None or logdir is not None:
             save_checkpoint = True
+            if checkpoints_directory is None: # the way to create a new directory is using logdir
+                checkpoints_directory = os.path.join(logdir, logname)
             if not os.path.isdir(checkpoints_directory):
                 os.mkdir(checkpoints_directory)
                 with open(os.path.join(checkpoints_directory, "script_params.json"), "w") as f:
@@ -338,7 +348,7 @@ class RIM(nn.Module):
                             "ema_decay": ema_decay,
                             "seed": seed,
                             "logname": logname,
-                            "logname_prefixe": logname_prefixe,
+                            "logname_prefix": logname_prefix,
                         },
                         f,
                         indent=4
@@ -402,7 +412,7 @@ class RIM(nn.Module):
                         g['lr'] = learning_rate * np.minimum(step / warmup, 1.0)
 
                 if clip > 0:
-                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=clip)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=clip)
 
                 optimizer.step()
                 ema.update()
@@ -411,6 +421,7 @@ class RIM(nn.Module):
                 time_per_step_epoch_mean += _time
                 cost += float(loss)
                 step += 1
+            scheduler.step()
 
             time_per_step_epoch_mean /= len(dataloader)
             cost /= len(dataloader)

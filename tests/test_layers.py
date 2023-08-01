@@ -77,3 +77,27 @@ def test_gru_block():
         assert layer.dimensions == dim
         assert h.shape == torch.Size([B, C, *D])
 
+def test_transposed_conv():
+    # This test is done inside score_models from which we get those layers, but repeat here since we rely on its behavior
+    from rim.layers import ConvTransposed1dSame, ConvTransposed2dSame, ConvTransposed3dSame
+    from rim.layers import Conv1dSame, Conv2dSame, Conv3dSame
+    B = 10
+    D = 15
+    C = 16
+    K = 3
+    for dim in [1, 2, 3]:
+        x = torch.randn(B, C, *[D]*dim)
+        layer_ = [Conv1dSame, Conv2dSame, Conv3dSame][dim-1]
+        layer = layer_(C, C, K, stride=2)
+        x_down= layer(x)
+        print("Down", x_down.shape)
+        assert x_down.shape == torch.Size([B, C, *[D//2]*dim])
+        
+        layer_ = [ConvTransposed1dSame, ConvTransposed2dSame, ConvTransposed3dSame][dim-1]
+        layer = layer_(C, C, K, stride=2)
+        y = layer(x_down)
+        print("Up", x.shape)
+        assert x.shape == torch.Size([B, C, *[D]*dim])
+        
+    
+
