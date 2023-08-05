@@ -50,9 +50,9 @@ class RIM(nn.Module):
             energy_fn (Callable, optional): The energy function used for parameter inference. 
                 If not provided, score_fn must be provided.
             T (int, optional): The number of iterations for the RIM optimization. Defaults to 10.
-            link_function (Callable, optional): The link function used to transform the parameters. 
-                If provided, inverse_link_function must also be provided.
-            inverse_link_function (Callable, optional): The inverse of the link function used to transform the parameters. 
+            link_function (Callable, optional): The link function used to transform the parameters from model space to physical space.
+                If provided, inverse_link_function must also be provided
+            inverse_link_function (Callable, optional): The inverse of the link function used to transform the parameters from physical space to model space.
                 If provided, link_function must also be provided.
             initialization_method (str, optional): The method used for parameter initialization. 
                 Supported values are "zeros", "approximate_inverse", and "model". Defaults to "zeros".
@@ -324,6 +324,7 @@ class RIM(nn.Module):
             logname = logname_prefix + "_" + datetime.now().strftime("%y%m%d%H%M%S")
 
         save_checkpoint = False
+        latest_checkpoint = 0
         if checkpoints_directory is not None or logdir is not None:
             save_checkpoint = True
             if checkpoints_directory is None: # the way to create a new directory is using logdir
@@ -376,9 +377,6 @@ class RIM(nn.Module):
                     optimizer.load_state_dict(torch.load(opt_path, map_location=self.device))
                     print(f"Loaded checkpoint {checkpoint_indices[max_checkpoint_index]} of {logname}")
                     latest_checkpoint = checkpoint_indices[max_checkpoint_index]
-            else:
-                latest_checkpoint = 0
-
         if seed is not None:
             torch.manual_seed(seed)
 

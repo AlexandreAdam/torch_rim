@@ -10,10 +10,10 @@ class Hourglass(Model):
     def __init__(
             self,
             channels,
+            dimensions=1,
             nf=32,
             ch_mult=(2, 2),
             hidden_units=32,
-            dimensions=1,
             num_layers=2,
             kernel_size=3, # in case dimensions>0
             conv_kernel_size=None, # parameter for the GRU block

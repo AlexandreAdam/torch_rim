@@ -1,7 +1,6 @@
 import torch
 from rim import RIM, Hourglass
-import shutil
-import sys, os
+import os, shutil
 
 def setup(dim):
     H = 32
@@ -53,6 +52,7 @@ def test_training():
             )
     print(losses)
     # Leave the checkpoints to be removed by last test
+
     
 
 def test_training_from_checkpoint():
@@ -88,5 +88,42 @@ def test_training_from_checkpoint():
             seed=seed
             )
     print(losses)
+
+def test_training_with_ema():
+    x, y, model, score_fn, energy_fn, H, B, C, T, D = setup(1)
+    checkpoints_directory = os.path.dirname(os.path.abspath(__file__)) + "/checkpoints"
+    rim = RIM(D, checkpoints_directory=checkpoints_directory, score_fn=score_fn, T=T)
+
+    class Dataset(torch.utils.data.Dataset):
+        def __len__(self):
+            return 2*B
+        def __getitem__(self, index):
+            return torch.randn(C, *D), torch.randn(C, *D)
+    
+    dataset = Dataset()
+
+    # Set the hyperparameters and other options for training
+    learning_rate = 1e-3
+    ema_decay=0.99
+    batch_size = B
+    epochs = 10
+    warmup = 0 # learning rate warmup
+    clip = 0. # gradient clipping
+    seed = 42
+
+    # Fit the model to the dataset
+    losses = rim.fit(
+            dataset, 
+            learning_rate=learning_rate, 
+            checkpoints_directory=checkpoints_directory,
+            models_to_keep=1,
+            ema_decay=ema_decay,
+            batch_size=batch_size, 
+            epochs=epochs, 
+            warmup=warmup, 
+            clip=clip, 
+            seed=seed
+            )
+
     # When test are finished, remove the checkpoint directory
     shutil.rmtree(checkpoints_directory)
