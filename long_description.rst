@@ -91,7 +91,7 @@ we can train the RIM to make it's gradient ascent trajectories as efficient as p
 
 .. math::
 
-   \mathcal{L}_\theta = \mathbb{E}_\mathcal{D} \left[ \sum_{t=1}^T\lVert \mathbf{w}_t(\hat{\mathbf{x}}_t - \mathbf{x}\rVert^2_2 \right]
+   \mathcal{L}_\theta = \mathbb{E}_\mathcal{D} \left[ \sum_{t=1}^T\lVert \mathbf{w}_t(\hat{\mathbf{x}}_t - \mathbf{x})\rVert^2_2 \right]
 
 :math:`\mathbf{w}_t` weighs each MSE on the parameter trajectory :math:`\big\{\mathbf{x}_t\big\}_{t=0}^T`.
 
