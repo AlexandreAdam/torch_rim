@@ -40,11 +40,11 @@ jobs:
           pip install -r requirements.txt
         shell: bash
           
-      - name: Install rim 
+      - name: Install torch_rim 
         run: |
           cd $GITHUB_WORKSPACE
           pip install -e .
-          pip show rim
+          pip show torch_rim
         shell: bash
 
       - name: Run tests with coverage
