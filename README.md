@@ -80,7 +80,7 @@ Equipped with a dataset of problem instances and their solutions $\mathbf{x}$
 we can train the RIM to make it's gradient ascent trajectories as efficient as possible by minimizing a weighted mean squared 
 loss
 ```math
-\mathcal{L}_\theta = \mathbb{E}_\mathcal{D} \left[ \sum_{t=1}^T\lVert \mathbf{w}_t(\hat{\mathbf{x}}_t - \mahtbf{x}\rVert^2_2 \right]\, .
+\mathcal{L}_\theta = \mathbb{E}_\mathcal{D} \left[ \sum_{t=1}^T\lVert \mathbf{w}_t(\hat{\mathbf{x}}_t - \mathbf{x}\rVert^2_2 \right]\, .
 ```
 $\mathbf{w}_t$ weighs each MSE on the parameter trajectory $\big\{\mathbf{x}_t\big\}_{t=0}^T$.
 
