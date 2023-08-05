@@ -1,5 +1,5 @@
 # RIM: Recurrent Inference Machines
-[![PyPI version](https://badge.fury.io/py/torch_rim.svg)](https://badge.fury.io/py/torch_rim)
+[![PyPI version](https://badge.fury.io/py/torch-rim.svg)](https://badge.fury.io/py/torch-rim)
 [![codecov](https://codecov.io/gh/AlexandreAdam/torch_rim/branch/master/graph/badge.svg)](https://codecov.io/gh/AlexandreAdam/torch_rim)
 
 This is an implementation of a Recurrent Inference Machine (see [Putzky & Welling (2017)](https://arxiv.org/abs/1706.04008)) 
@@ -94,7 +94,7 @@ If you find this work useful, please consider citing
     journal = {arXiv e-prints},
     archivePrefix = {arXiv},
     eprint = {0902.0885},
-    primaryClass = {Neural and Evolutionary Computing},
+    primaryClass = {cs.NE},
     title = {{Recurrent Inference Machines for Solving Inverse Problems}},
     url = {http://arxiv.org/abs/1706.04008},
     year = {2017}
@@ -202,3 +202,8 @@ archivePrefix = {arXiv},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 ```
+
+# License
+
+This package is licensed under the MIT License.
+
