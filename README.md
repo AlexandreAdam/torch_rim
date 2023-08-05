@@ -75,7 +75,7 @@ The RIM is trained using an outer loop optimisation contructed with labels $\mat
 ```
 Equipped with a dataset of problem instances and their solutions $\mathbf{x}$
 ```math
-\mathcal{D} = \big\{\mathbf{y}^{(i)},\, \mathbf{x}^{(i)},\, \nabla_{\mathbf{x} \mid \mathbf{y}}^{(i)}\big\}_{i=1}^N$\, ,
+\mathcal{D} = \big\{\mathbf{y}^{(i)},\, \mathbf{x}^{(i)},\, \nabla_{\mathbf{x} \mid \mathbf{y}}^{(i)}\big\}_{i=1}^N\, ,
 ```
 we can train the RIM to make it's gradient ascent trajectories as efficient as possible by minimizing a weighted mean squared 
 loss
