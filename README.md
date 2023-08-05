@@ -51,7 +51,7 @@ x_hat = rim.predict(y, A, Sigma) # of with the signature (y, F, Sigma) with the 
 
 A RIM is a gradient-based meta-learning algorithm. It is trained not as a feed-forward neural network, but rather as an optimisation 
 algorithm. More specifically, the RIM is given a *problem instance* specified by a likelihood score $\nabla_\mathbf{x} \log p(y \mid x)$, 
-or more generally a posterior scoe function $\nabla_{\mathbf{x} \mid \mathbf{y}} \equiv \nabla_{\mathbf{x}} \log p(x \mid y)$, and an observation $y$ to condition said posterior. 
+or more generally a posterior score function $\nabla_{\mathbf{x} \mid \mathbf{y}} \equiv \nabla_{\mathbf{x}} \log p(x \mid y)$, and an observation $y$ to condition said posterior. 
 
 The RIM uses this information to perform a learned gradient ascent algorithm on the posterior. 
 This procedure will produce a MAP estimate of the parameters of interests $\mathbf{x}$ when the RIM is trained
@@ -101,7 +101,7 @@ If you find this work useful, please consider citing
 }
 ```
 You might also find some of the following applications of the RIM useful
-#### [Adam et al. (2023)](https://iopscience.iop.org/article/10.3847/1538-4357/accf84#references) (Gravitational lensing)
+#### [Adam et al. (2023)](https://iopscience.iop.org/article/10.3847/1538-4357/accf84) (Gravitational lensing)
 ```bibtex
 @article{Adam2023,
        author = {{Adam}, Alexandre and {Perreault-Levasseur}, Laurence and {Hezaveh}, Yashar and {Welling}, Max},
@@ -123,7 +123,7 @@ archivePrefix = {arXiv},
 }
 ```
 
-#### [Morningstar et al. (2019)]() (Gravitational lensing)
+#### [Morningstar et al. (2019)](https://iopscience.iop.org/article/10.3847/1538-4357/accf84) (Gravitational lensing)
 ```bibtex
 @article{Morningstar2019,
        author = {{Morningstar}, Warren R. and {Perreault Levasseur}, Laurence and {Hezaveh}, Yashar D. and {Blandford}, Roger and {Marshall}, Phil and {Putzky}, Patrick and {Rueter}, Thomas D. and {Wechsler}, Risa and {Welling}, Max},

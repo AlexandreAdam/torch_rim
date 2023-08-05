@@ -2,11 +2,11 @@
 RIM: Recurrent Inference Machines
 =======================================
 
-.. image:: https://badge.fury.io/py/torch_rim.svg
-    :target: https://badge.fury.io/py/torch_rim
+.. image:: https://badge.fury.io/py/torch-rim.svg
+    :target: https://badge.fury.io/py/torch-rim
 
 .. image:: https://codecov.io/gh/AlexandreAdam/torch_rim/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/AlexandreAdam/torch_rim
+    :target: https://codecov.io/gh/AlexandreAdam/torch-rim
 
 This is an implementation of a Recurrent Inference Machine (see `Putzky & Welling (2017) <https://arxiv.org/abs/1706.04008>`_)
 alongside some standard neural network architectures for the type of problem RIM can solve.
@@ -62,14 +62,16 @@ Background
 ----------
 A RIM is a gradient-based meta-learning algorithm. It is trained not as a feed-forward neural network, but rather as an optimisation 
 algorithm. More specifically, the RIM is given a *problem instance* specified by a likelihood score :math:`\nabla_\mathbf{x} \log p(y \mid x)`, 
-or more generally a posterior scoe function :math:`\nabla_{\mathbf{x} \mid \mathbf{y}} \equiv \nabla_{\mathbf{x}} \log p(x \mid y)`, and an observation :math:`y` to condition said posterior.
+or more generally a posterior score function :math:`\nabla_{\mathbf{x} \mid \mathbf{y}} \equiv \nabla_{\mathbf{x}} \log p(x \mid y)`, and an observation :math:`y` to condition said posterior.
 
 The RIM uses this information to perform a learned gradient ascent algorithm on the posterior. This procedure will produce a MAP estimate of the parameters of interests :math:`\mathbf{x}` when the RIM is trained.
 
 .. math::
 
+   \begin{align}
    \hat{\mathbf{x}}_{t+1} &= \hat{\mathbf{x}}_t + \mathbf{g}_\theta (\hat{\mathbf{x}}_t,\, \mathbf{y},\, \nabla_{\hat{\mathbf{x}}_t \mid \mathbf{y}},\, \mathbf{h}_t)\\
    \mathbf{h}_{t+1} &= \mathbf{g}_\theta(\hat{\mathbf{x}}_t,\, \mathbf{y},\, \nabla_{\hat{\mathbf{x}}_t \mid \mathbf{y}},\, \mathbf{h}_t)
+   \end{align}
 
 for :math:`t \in [0, T]`. 
 
@@ -115,7 +117,7 @@ If you find this work useful, please consider citing:
         year = {2017}
     }
 
-- `Adam et al. (2023) <https://iopscience.iop.org/article/10.3847/1538-4357/accf84#references>`_ (Gravitational lensing)
+- `Adam et al. (2023) <https://iopscience.iop.org/article/10.3847/1538-4357/accf84>`_ (Gravitational lensing)
     .. code-block:: bibtex
 
     @article{Adam2023,
