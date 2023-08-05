@@ -6,10 +6,11 @@ with open("long_description.rst", "r") as fh:
 
 setup(
     name='torch_rim',
-    version='0.2.1',
+    version='0.2.2',
     author='Alexandre Adam',
     author_email='alexande.adam@umontreal.ca',
     description='A torch implementation of the Recurrent Inference Machine',
+    long_description=long_description,
     url="https://github.com/AlexandreAdam/torch_rim",
     packages=find_packages(),
     install_requires=[
