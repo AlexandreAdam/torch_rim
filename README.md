@@ -166,7 +166,7 @@ archivePrefix = {arXiv},
 }
 ```
 
-#### [Lönning et al. (2019)](https://pubmed.ncbi.nlm.nih.gov/30703579) (MRI imaging)
+#### [Lønning et al. (2019)](https://pubmed.ncbi.nlm.nih.gov/30703579) (MRI imaging)
 ```bibtex
 @article{Lonning2019,
     author = {L{\o}nning, Kai and Putzky, Patrick and Sonke, Jan Jakob and Reneman, Liesbeth and Caan, Matthan W.A. and Welling, Max},

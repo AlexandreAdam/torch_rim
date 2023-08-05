@@ -180,7 +180,7 @@ If you find this work useful, please consider citing:
           adsnote = {Provided by the SAO/NASA Astrophysics Data System}
     }
 
-- `Lönning et al. (2019) <https://pubmed.ncbi.nlm.nih.gov/30703579>`_ (MRI imaging)
+- `Lønning et al. (2019) <https://pubmed.ncbi.nlm.nih.gov/30703579>`_ (MRI imaging)
     .. code-block:: bibtex
     @article{Lonning2019,
         author = {L{\o}nning, Kai and Putzky, Patrick and Sonke, Jan Jakob and Reneman, Liesbeth and Caan, Matthan W.A. and Welling, Max},
