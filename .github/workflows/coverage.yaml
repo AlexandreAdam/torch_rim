@@ -44,14 +44,14 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           pip install -e .
-          pip show rim
+          pip show torch_rim
         shell: bash
 
       - name: Run tests with coverage
         run: |
           cd $GITHUB_WORKSPACE
           pwd
-          pytest --cov-report=xml --cov=rim tests/
+          pytest --cov-report=xml --cov=torch_rim tests/
         shell: bash
 
       - name: Upload coverage report to Codecov
