@@ -52,7 +52,7 @@ Usage
     rim = RIM(dimensions, net, energy_fn=energy_fn)
 
     # Train the rim, and save its weight in checkpoints_directory
-    model.fit(dataset=your_dataset, epochs=100, learning_rate=1e-4, checkpoints_directory=checkpoints_directory)
+    rim.fit(dataset, epochs=100, learning_rate=1e-4, checkpoints_directory=checkpoints_directory)
 
     # Make a prediction on an observation y
     x_hat = rim.predict(y, A, Sigma) # of with the signature (y, F, Sigma) with the energy_fn
