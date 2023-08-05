@@ -40,18 +40,18 @@ jobs:
           pip install -r requirements.txt
         shell: bash
           
-      - name: Install torch_rim 
+      - name: Install rim 
         run: |
           cd $GITHUB_WORKSPACE
           pip install -e .
-          pip show torch_rim
+          pip show rim
         shell: bash
 
       - name: Run tests with coverage
         run: |
           cd $GITHUB_WORKSPACE
           pwd
-          pytest --cov-report=xml --cov=score_models tests/
+          pytest --cov-report=xml --cov=rim tests/
         shell: bash
 
       - name: Upload coverage report to Codecov
