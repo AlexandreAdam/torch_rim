@@ -25,7 +25,7 @@ Usage
 
 .. code-block:: python
 
-    from torch_rim import RIM, Hourglass, Unet
+    from rim import RIM, Hourglass, Unet
     from torch.func import vmap
 
     # B is the batch size
