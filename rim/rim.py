@@ -139,11 +139,9 @@ class RIM(nn.Module):
                 linked_x, vjp_func = vjp(self.link_function, x)
                 score = self.score_fn(linked_x, y, *args, **kwargs)
                 return vjp_func(score)[0]
-            
         self.score_fn = score_fn
         self.model_score_fn = model_score_fn
         self.energy_fn = energy_fn
-            
     
     def initialization(self, observation) -> tuple[list[Tensor], Tensor, Tensor]:
         """
@@ -208,9 +206,9 @@ class RIM(nn.Module):
             args and kwargs: Additional arguments and keyword arguments for the score function.
         
         Returns:
-            Tensor: The predicted parameter x after the RIM optimization (in parameter space). 
+            Tensor: The predicted parameter x after the RIM optimization (in physical space). 
         """
-        return self.inverse_link_function(self.forward(y, *args, **kwargs)[-1])
+        return self.link_function(self.forward(y, *args, **kwargs)[-1])
             
     def adam_score_update(self, score: Tensor, time_step: int):
         """
@@ -377,9 +375,9 @@ class RIM(nn.Module):
                     optimizer.load_state_dict(torch.load(opt_path, map_location=self.device))
                     print(f"Loaded checkpoint {checkpoint_indices[max_checkpoint_index]} of {logname}")
                     latest_checkpoint = checkpoint_indices[max_checkpoint_index]
+
         if seed is not None:
             torch.manual_seed(seed)
-
         best_loss = float('inf')
         losses = []
         step = 0
